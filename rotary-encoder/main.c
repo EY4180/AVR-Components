@@ -40,7 +40,7 @@ ISR(PCINT1_vect)
     }
 }
 
-void init_encoder()
+int main(void)
 {
     cli();                                                            // disable interrupts for setup
     DDRC &= ~(_BV(PC0) | _BV(PC1) | _BV(PC2) | _BV(PC3));             // set as input
@@ -49,11 +49,6 @@ void init_encoder()
     PCMSK1 = _BV(PCINT8) | _BV(PCINT9) | _BV(PCINT10) | _BV(PCINT11); // set interrupt masks
     DDRD = 0xFF;                                                      // set all port d as output
     sei();                                                            // enable interrupts globally
-}
-
-int main(void)
-{
-    init_encoder();
 
     while (1)
     {
