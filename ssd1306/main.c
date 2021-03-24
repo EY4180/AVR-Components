@@ -1,9 +1,13 @@
 #include <avr/io.h>
-#include <avr/interrupt.h>
 #include <avr/pgmspace.h>
 #include <stdint.h>
 
 #define ADDRESS 0b01111000
+#define READ 0xFF
+#define WRITE 0x00
+
+#define INSTRUCTION 0x80
+#define DATA 0x40
 
 FUSES = {
 	.low = FUSE_CKSEL0,
@@ -116,66 +120,68 @@ void twi_block()
 	}
 }
 
-void twi_send_command(char *command, int size)
+void twi_send(const uint8_t data)
 {
-	// send start condition
-	TWCR = (1 << TWINT) | (1 << TWSTA) | (1 << TWEN) | _BV(TWEA);
+	TWDR = data;
+	TWCR = _BV(TWINT) | _BV(TWEN) | _BV(TWEA);
 	twi_block();
-
-	// send the address first
-	TWDR = ADDRESS;
-	TWCR = (1 << TWINT) | (1 << TWEN) | _BV(TWEA);
-	twi_block();
-
-	for (int i = 0; i < size; i++)
-	{
-		// send control byte
-		TWDR = 0x80;
-		TWCR = (1 << TWINT) | (1 << TWEN) | _BV(TWEA);
-		twi_block();
-
-		// send command
-		TWDR = command[i];
-		TWCR = (1 << TWINT) | (1 << TWEN) | _BV(TWEA);
-		twi_block();
-	}
-	// send stop condition
-	TWCR = (1 << TWINT) | (1 << TWEN) | (1 << TWSTO | _BV(TWEA));
 }
 
-void twi_send_data(char *data, int size)
+void twi_start(const uint8_t address, const uint8_t rw)
 {
 	// send start condition
-	TWCR = (1 << TWINT) | (1 << TWSTA) | (1 << TWEN) | _BV(TWEA);
+	TWCR = _BV(TWINT) | _BV(TWSTA) | _BV(TWEN) | _BV(TWEA);
 	twi_block();
 
 	// send the address first
-	TWDR = ADDRESS;
-	TWCR = (1 << TWINT) | (1 << TWEN) | _BV(TWEA);
+	TWDR = __builtin_avr_insert_bits(0xfffffff0, rw, address);
+	TWCR = _BV(TWINT) | _BV(TWEN) | _BV(TWEA);
 	twi_block();
+}
 
-	// send control byte
-	TWDR = 0x40;
-	TWCR = (1 << TWINT) | (1 << TWEN) | _BV(TWEA);
-	twi_block();
+void twi_stop()
+{
+	TWCR = _BV(TWINT) | _BV(TWEN) | _BV(TWEA) | _BV(TWSTO);
+}
 
-	// send data
-	for (int n = 0; n < size; n++)
+void twi_send_command(const uint8_t *control, const size_t size)
+{
+	twi_start(ADDRESS, WRITE);
+
+	for (size_t i = 0; i < size; ++i)
 	{
-		TWDR = data[n];
-		TWCR = (1 << TWINT) | (1 << TWEN) | _BV(TWEA);
-		twi_block();
+		// send control byte
+		twi_send(INSTRUCTION);
+		// send command
+		twi_send(control[i]);
 	}
 
 	// send stop condition
-	TWCR = (1 << TWINT) | (1 << TWEN) | (1 << TWSTO) | _BV(TWEA);
+	twi_stop();
+}
+
+void twi_send_data(const uint8_t *data, const size_t size)
+{
+	twi_start(ADDRESS, WRITE);
+
+	// send control byte
+	twi_send(DATA);
+
+	// send data
+	for (size_t n = 0; n < size; ++n)
+	{
+		twi_send(data[n]);
+	}
+
+	// send stop condition
+	twi_stop();
 }
 
 void clear_display()
 {
-	for (int page = 0xB0; page < 0xB8; page++)
+	for (size_t page = 0xB0; page < 0xB8; ++page)
 	{
-		char set_page[] = {
+		const uint8_t set_page[] = {
 			0x20, // set addressing mode
 			0x02, // set page addressing mode
 			page, // change to correct page
@@ -183,22 +189,29 @@ void clear_display()
 			0x10  // set higher nibble column address to 0
 		};
 
-		int command_length = sizeof(set_page) / sizeof(*set_page);
+		const size_t command_length = sizeof(set_page) / sizeof(*set_page);
 
 		twi_send_command(set_page, command_length);
-		char empty_page[128];
-		for (int i = 0; i < 128; i++)
+		
+		twi_start(ADDRESS, WRITE);
+
+		// send control byte
+		twi_send(DATA);
+
+		// send data
+		for (size_t n = 0; n < 128; ++n)
 		{
-			empty_page[i] = 0;
+			twi_send(0x00);
 		}
 
-		twi_send_data(empty_page, 128);
+		// send stop condition
+		twi_stop();
 	}
 }
 
-void send_string(char *string, int position, int length)
+void send_string(const char *string, const uint16_t position, const size_t length)
 {
-	char set_page[] = {
+	uint8_t set_page[] = {
 		0x20,							// set addressing mode
 		0x02,							// set page addressing mode
 		position >> 8,					// change to correct page
@@ -208,12 +221,12 @@ void send_string(char *string, int position, int length)
 
 	twi_send_command(set_page, sizeof(set_page) / sizeof(*set_page));
 
-	for (int i = 0; i < length; i++)
+	for (size_t i = 0; i < length; i++)
 	{
-		int index = string[i] - ' ';
-		char pixels[5];
+		size_t index = string[i] - ' ';
+		uint8_t pixels[5];
 
-		for (int j = 0; j < 4; j++)
+		for (size_t j = 0; j < 4; j++)
 		{
 			pixels[j] = pgm_read_byte(&font[index][j]);
 		}
@@ -226,7 +239,7 @@ void send_string(char *string, int position, int length)
 
 void init_display()
 {
-	char startup[] = {
+	uint8_t startup[] = {
 		0xA8, // set multiplex ratio
 		0xFF, // set multiplex ratio to 64
 		0xD3, // set vertical shift
@@ -248,7 +261,7 @@ void init_display()
 		0xAF  // turn display on
 	};
 
-	int command_length = sizeof(startup) / sizeof(*startup);
+	size_t command_length = sizeof(startup) / sizeof(*startup);
 
 	TWBR = 0xFF; // set baud rate
 	twi_send_command(startup, command_length);
@@ -256,9 +269,18 @@ void init_display()
 
 int main()
 {
+	__builtin_avr_cli();
+	
+	init_display();
+	clear_display();
+	send_string("Hello, world", 0xB000, 12);
+
+	__builtin_avr_sei();
+
 	while (1)
 	{
 		continue;
 	}
+
 	return 0;
 }
