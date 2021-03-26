@@ -2,6 +2,7 @@ DEVICE     = atmega328p
 CLOCK      = 16000000
 PROGRAMMER = -e -v -p $(DEVICE) -c arduino -P COM6 -b 19200 -D 
 OBJECTS    = main.o
+FUSES      = -U lfuse:w:0xFF:m -U hfuse:w:0xDE:m
 
 ######################################################################
 ######################################################################
@@ -19,6 +20,9 @@ all:	main.hex
 
 flash:	all
 	$(AVRDUDE) -U flash:w:main.hex:i
+
+fuse:
+	$(AVRDUDE) $(FUSES)
 
 clean:
 	del main.hex main.elf $(OBJECTS)

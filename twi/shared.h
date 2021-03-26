@@ -2,6 +2,7 @@
 #include <util/crc16.h>
 #include <avr/io.h>
 #include <util/twi.h>
+#include <util/delay.h>
 
 #include <stdbool.h>
 #include <string.h>

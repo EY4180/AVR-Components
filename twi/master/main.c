@@ -39,11 +39,6 @@ void twi_master_transmitter(FRAME *frame, uint8_t address)
 			TWCR = _BV(TWINT) | _BV(TWEN);
 			break;
 
-		// state: state transition in progress
-		// action: wait until action complete
-		case TW_NO_INFO:
-			break;
-
 		// state: missed acknowledge window
 		// action: end transmission
 		case TW_MT_DATA_NACK:
@@ -53,6 +48,9 @@ void twi_master_transmitter(FRAME *frame, uint8_t address)
 		default:
 			break;
 		}
+
+		// wait until action complete
+		loop_until_bit_is_set(TWCR, TWINT);
 	}
 
 BUS_ERROR:
