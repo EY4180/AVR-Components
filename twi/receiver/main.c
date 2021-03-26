@@ -7,7 +7,7 @@ FUSES = {
 	.high = FUSE_SPIEN & FUSE_BODLEVEL2 & FUSE_BODLEVEL1,
 	.extended = EFUSE_DEFAULT};
 
-void twi_slave_receiver(FRAME *frame)
+void twi_slave(FRAME *frame)
 {
 	uint8_t received_bytes = 0;
 	uint8_t stream[FRAME_SIZE];
@@ -34,17 +34,21 @@ void twi_slave_receiver(FRAME *frame)
 			stream[received_bytes++] = TWDR;
 			break;
 
+		// state: valid stop condition detected
+		// action: copy data stream to frame buffer
 		case TW_SR_STOP:
 			memcpy(frame, stream, FRAME_SIZE);
 			listening = false;
 			break;
 
+		// state: state transition in progress
+		// action: wait until action complete
+		case TW_NO_INFO:
+			break;
+
 		default:
 			break;
 		}
-
-		// wait until action complete
-		loop_until_bit_is_set(TWCR, TWINT);
 	}
 }
 
@@ -59,7 +63,7 @@ int main()
 
 	while (1)
 	{
-		twi_slave_receiver(&my_frame);
+		twi_slave(&my_frame);
 		uint8_t received_crc = 0;
 		for (int i = 0; i < BUFFER_SIZE; i++)
 		{
