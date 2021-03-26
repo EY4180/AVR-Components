@@ -3,6 +3,7 @@
 #include <avr/io.h>
 #include <util/twi.h>
 
+#include <stdbool.h>
 #include <string.h>
 #include <stdlib.h>
 

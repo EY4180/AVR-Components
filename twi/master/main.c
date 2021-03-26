@@ -5,7 +5,7 @@ FUSES = {
 	.high = FUSE_SPIEN & FUSE_BODLEVEL2 & FUSE_BODLEVEL1,
 	.extended = EFUSE_DEFAULT};
 
-void twi_master(FRAME *frame, uint8_t address)
+void twi_master_transmitter(FRAME *frame, uint8_t address)
 {
 	const uint8_t frame_size = sizeof(*frame);
 	uint8_t transmitted_bytes = 0;
@@ -73,13 +73,14 @@ int main()
 	for (uint8_t i = 0; i < BUFFER_SIZE; i++)
 	{
 		my_frame.data[i] = 'a' + i;
+		my_frame.crc = _crc8_ccitt_update(my_frame.crc, my_frame.data[i]);
 	}
 
 	__builtin_avr_sei();
 	
 	while (1)
 	{
-		twi_master(&my_frame, SLAVE_ADDRESS);
+		twi_master_transmitter(&my_frame, SLAVE_ADDRESS);
 		__builtin_avr_delay_cycles(F_CPU);
 	}
 	

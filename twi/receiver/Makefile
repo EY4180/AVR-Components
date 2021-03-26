@@ -1,6 +1,6 @@
 DEVICE     = atmega328p
 CLOCK      = 16000000
-PROGRAMMER = -e -v -p $(DEVICE) -c arduino -P COM3 -b 19200 -D 
+PROGRAMMER = -e -v -p $(DEVICE) -c arduino -P COM6 -b 19200 -D 
 OBJECTS    = main.o
 
 ######################################################################
