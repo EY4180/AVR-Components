@@ -1,5 +1,7 @@
 #include "../shared.h"
 
+#define FRAME_SIZE sizeof(FRAME)
+
 FUSES = {
 	.low = FUSE_CKSEL0,
 	.high = FUSE_SPIEN & FUSE_BODLEVEL2 & FUSE_BODLEVEL1,
@@ -7,10 +9,9 @@ FUSES = {
 
 void twi_slave_receiver(FRAME *frame)
 {
-	const uint8_t frame_size = sizeof(*frame);
 	uint8_t received_bytes = 0;
+	uint8_t stream[FRAME_SIZE];
 	bool listening = true;
-	uint8_t stream[frame_size];
 
 	// state: idle
 	// action: select slave receiver mode
@@ -34,15 +35,16 @@ void twi_slave_receiver(FRAME *frame)
 			break;
 
 		case TW_SR_STOP:
+			memcpy(frame, stream, FRAME_SIZE);
 			listening = false;
-			memcpy(frame, stream, frame_size);
 			break;
 
 		default:
-			// wait until action complete
-			loop_until_bit_is_set(TWCR, TWINT);
 			break;
 		}
+
+		// wait until action complete
+		loop_until_bit_is_set(TWCR, TWINT);
 	}
 }
 
@@ -63,7 +65,7 @@ int main()
 		{
 			received_crc = _crc8_ccitt_update(received_crc, my_frame.data[i]);
 		}
-		
+
 		if (received_crc == my_frame.crc)
 		{
 			PORTD = ~PORTD;

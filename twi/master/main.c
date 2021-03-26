@@ -1,5 +1,7 @@
 #include "../shared.h"
 
+#define FRAME_SIZE (sizeof(FRAME))
+
 FUSES = {
 	.low = FUSE_CKSEL0,
 	.high = FUSE_SPIEN & FUSE_BODLEVEL2 & FUSE_BODLEVEL1,
@@ -7,17 +9,15 @@ FUSES = {
 
 void twi_master_transmitter(FRAME *frame, uint8_t address)
 {
-	const uint8_t frame_size = sizeof(*frame);
 	uint8_t transmitted_bytes = 0;
-
-	uint8_t stream[frame_size];
-	memcpy(stream, frame, frame_size);
+	uint8_t stream[FRAME_SIZE];
+	memcpy(stream, frame, FRAME_SIZE);
 
 	// state: idle
 	// action: send start condition
 	TWCR = _BV(TWINT) | _BV(TWSTA) | _BV(TWEN);
 
-	while (transmitted_bytes < frame_size)
+	while (transmitted_bytes < FRAME_SIZE)
 	{
 		switch (TW_STATUS)
 		{
@@ -40,7 +40,7 @@ void twi_master_transmitter(FRAME *frame, uint8_t address)
 			break;
 
 		// state: missed acknowledge window
-		// action: end transmission 
+		// action: end transmission
 		case TW_MT_DATA_NACK:
 		case TW_MT_SLA_NACK:
 			goto BUS_ERROR;
@@ -53,7 +53,7 @@ void twi_master_transmitter(FRAME *frame, uint8_t address)
 		loop_until_bit_is_set(TWCR, TWINT);
 	}
 
-	BUS_ERROR:
+BUS_ERROR:
 
 	// state: transmission complete
 	// action: send stop condition
@@ -77,12 +77,12 @@ int main()
 	}
 
 	__builtin_avr_sei();
-	
+
 	while (1)
 	{
 		twi_master_transmitter(&my_frame, SLAVE_ADDRESS);
 		__builtin_avr_delay_cycles(F_CPU);
 	}
-	
+
 	return 0;
 }
