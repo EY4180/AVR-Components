@@ -9,6 +9,7 @@ FUSES = {
 
 void twi_master_transmitter(FRAME *frame, uint8_t address)
 {
+	bool sending = true;
 	uint8_t transmitted_bytes = 0;
 	uint8_t stream[FRAME_SIZE];
 	memcpy(stream, frame, FRAME_SIZE);
@@ -17,7 +18,7 @@ void twi_master_transmitter(FRAME *frame, uint8_t address)
 	// action: send start condition
 	TWCR = _BV(TWINT) | _BV(TWSTA) | _BV(TWEN);
 
-	while (transmitted_bytes < FRAME_SIZE)
+	while (sending)
 	{
 		switch (TW_STATUS)
 		{
@@ -37,13 +38,15 @@ void twi_master_transmitter(FRAME *frame, uint8_t address)
 		case TW_MT_DATA_ACK:
 			TWDR = stream[transmitted_bytes++];
 			TWCR = _BV(TWINT) | _BV(TWEN);
+			sending = transmitted_bytes < FRAME_SIZE;
 			break;
 
 		// state: missed acknowledge window
 		// action: end transmission
 		case TW_MT_DATA_NACK:
 		case TW_MT_SLA_NACK:
-			goto BUS_ERROR;
+			sending = false;
+			break;
 
 		default:
 			break;
@@ -52,8 +55,6 @@ void twi_master_transmitter(FRAME *frame, uint8_t address)
 		// wait until action complete
 		loop_until_bit_is_set(TWCR, TWINT);
 	}
-
-BUS_ERROR:
 
 	// state: transmission complete
 	// action: send stop condition
