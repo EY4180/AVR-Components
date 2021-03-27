@@ -1,6 +1,0 @@
-{
-	"files.associations": {
-		"shared.h": "c",
-		"inttypes.h": "c"
-	}
-}
