@@ -1,6 +1,6 @@
 #include "../shared.h"
 
-void twi_master_receiever(const FRAME *frame, const uint8_t address)
+void twi_master_receiever(FRAME *frame, const uint8_t address)
 {
 	bool link_established = true;
 	uint8_t byte = 0;
@@ -22,9 +22,18 @@ void twi_master_receiever(const FRAME *frame, const uint8_t address)
 			TWCR = _BV(TWINT) | _BV(TWEN);
 			break;
 
+		case TW_MR_SLA_ACK:
+			TWCR = _BV(TWINT) | _BV(TWEN) | _BV(TWEA);
+			break;
+		case TW_MR_DATA_ACK:
+			stream[byte++] = TWDR;
+			TWCR = _BV(TWINT) | _BV(TWEN) | _BV(TWEA);
+			break;
+
 		// state: missed acknowledge window
 		// action: end transmission
 		default:
+			link_established = false;
 			break;
 		}
 
@@ -34,6 +43,8 @@ void twi_master_receiever(const FRAME *frame, const uint8_t address)
 	// state: transmission complete
 	// action: send stop condition
 	TWCR = _BV(TWINT) | _BV(TWSTO) | _BV(TWEN);
+
+	memcpy(frame, stream, FRAME_SIZE);
 }
 
 void twi_master_transmitter(const FRAME *frame, const uint8_t address)
@@ -85,6 +96,18 @@ void twi_master_transmitter(const FRAME *frame, const uint8_t address)
 	TWCR = _BV(TWINT) | _BV(TWSTO) | _BV(TWEN);
 }
 
+void init_frame(FRAME *frame)
+{
+	frame->crc = 0;
+	frame->control = 0xFF;
+
+	for (size_t i = 0; i < BUFFER_SIZE; i++)
+	{
+		frame->data[i] = 'a' + i;
+		frame->crc = _crc8_ccitt_update(frame->crc, frame->data[i]);
+	}	
+}
+
 int main()
 {
 	__builtin_avr_cli();
@@ -93,20 +116,24 @@ int main()
 	TWBR = 0xFF;
 	TWAR = MASTER_ADDRESS;
 
-	FRAME my_frame;
-	my_frame.crc = 0;
-	my_frame.control = 0xFF;
-
-	for (uint8_t i = 0; i < BUFFER_SIZE; i++)
-	{
-		my_frame.data[i] = 'a' + i;
-		my_frame.crc = _crc8_ccitt_update(my_frame.crc, my_frame.data[i]);
-	}
 	__builtin_avr_sei();
 
 	while (1)
 	{
-		twi_master_transmitter(&my_frame, SLAVE_ADDRESS);
+		FRAME my_frame;
+		twi_master_receiever(&my_frame, SLAVE_ADDRESS);
+
+		uint8_t received_crc = 0;
+		for (int i = 0; i < BUFFER_SIZE; i++)
+		{
+			received_crc = _crc8_ccitt_update(received_crc, my_frame.data[i]);
+		}
+
+		if (received_crc == my_frame.crc)
+		{
+			PORTD = ~PORTD;
+		}
+
 		__builtin_avr_delay_cycles(F_CPU);
 	}
 

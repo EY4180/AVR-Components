@@ -8,7 +8,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define BUFFER_SIZE 8
+#define BUFFER_SIZE 1
 #define STREAM_SIZE 32
 
 #define SLAVE_ADDRESS 0xA0

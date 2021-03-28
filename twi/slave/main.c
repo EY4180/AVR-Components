@@ -36,7 +36,23 @@ void twi_slave(FRAME *frame)
 			memcpy(frame, stream, FRAME_SIZE);
 			link_established = false;
 			break;
-		
+
+		case TW_ST_SLA_ACK:
+			memcpy(stream, frame, FRAME_SIZE);
+		case TW_ST_DATA_ACK:
+			TWDR = stream[byte++];
+			
+			if (byte == FRAME_SIZE)
+			{
+				TWCR = _BV(TWINT) | _BV(TWEN);
+			}
+			else
+			{
+				TWCR = _BV(TWINT) | _BV(TWEA) | _BV(TWEN);
+			}
+			
+			break;
+
 		default:
 			link_established = false;
 			break;
@@ -47,29 +63,31 @@ void twi_slave(FRAME *frame)
 	} while (link_established);
 }
 
+void init_frame(FRAME *frame)
+{
+	frame->crc = 0;
+	frame->control = 0xFF;
+
+	for (size_t i = 0; i < BUFFER_SIZE; i++)
+	{
+		frame->data[i] = 'a' + i;
+		frame->crc = _crc8_ccitt_update(frame->crc, frame->data[i]);
+	}	
+}
+
 int main()
 {
 	__builtin_avr_cli();
 	TWAR = SLAVE_ADDRESS;
 	DDRD = 0xFF;
 
-	FRAME my_frame;
-
 	__builtin_avr_sei();
 
 	while (1)
 	{
+		FRAME my_frame;
+		init_frame(&my_frame);
 		twi_slave(&my_frame);
-		uint8_t received_crc = 0;
-		for (int i = 0; i < BUFFER_SIZE; i++)
-		{
-			received_crc = _crc8_ccitt_update(received_crc, my_frame.data[i]);
-		}
-
-		if (received_crc == my_frame.crc)
-		{
-			PORTD = ~PORTD;
-		}
 	}
 
 	return 0;
