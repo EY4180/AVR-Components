@@ -13,9 +13,14 @@
 #define SLAVE_ADDRESS 0xA0
 #define MASTER_ADDRESS 0xB0
 
+#define BAUD 1000
+#define BAUD_REGISTER ((F_CPU / BAUD - 16) >> 1)
+
 typedef struct frame
 {
 	uint8_t control;
 	uint8_t crc;
 	uint8_t data[BUFFER_SIZE];
 } FRAME;
+
+#define FRAME_SIZE (sizeof(FRAME))

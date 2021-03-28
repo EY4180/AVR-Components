@@ -1,13 +1,6 @@
 #include "../shared.h"
 
-#define FRAME_SIZE (sizeof(FRAME))
-
-FUSES = {
-	.low = FUSE_CKSEL0,
-	.high = FUSE_SPIEN & FUSE_BODLEVEL2 & FUSE_BODLEVEL1,
-	.extended = EFUSE_DEFAULT};
-
-void twi_master_transmitter(FRAME *frame, uint8_t address)
+void twi_master_transmitter(FRAME *frame, uint8_t address, uint8_t rw)
 {
 	bool sending = true;
 	uint8_t transmitted_bytes = 0;
@@ -18,14 +11,17 @@ void twi_master_transmitter(FRAME *frame, uint8_t address)
 	// action: send start condition
 	TWCR = _BV(TWINT) | _BV(TWSTA) | _BV(TWEN);
 
+	// wait until action complete
+	loop_until_bit_is_set(TWCR, TWINT);
+
 	while (sending)
 	{
 		switch (TW_STATUS)
 		{
 		// state: start condition sent
-		// action: send SLA+W
+		// action: send SLA+W/R
 		case TW_START:
-			TWDR = address;
+			TWDR = __builtin_avr_insert_bits(0xfffffff0, rw, address);
 			TWCR = _BV(TWINT) | _BV(TWEN);
 			break;
 
@@ -64,7 +60,7 @@ void twi_master_transmitter(FRAME *frame, uint8_t address)
 int main()
 {
 	__builtin_avr_cli();
-	TWBR = 0xFF;
+	TWBR = BAUD_REGISTER;
 	TWAR = MASTER_ADDRESS;
 
 	FRAME my_frame;
@@ -81,7 +77,7 @@ int main()
 
 	while (1)
 	{
-		twi_master_transmitter(&my_frame, SLAVE_ADDRESS);
+		twi_master_transmitter(&my_frame, SLAVE_ADDRESS, TW_WRITE);
 		__builtin_avr_delay_cycles(F_CPU);
 	}
 

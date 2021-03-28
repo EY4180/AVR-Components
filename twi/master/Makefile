@@ -1,8 +1,11 @@
 DEVICE     = atmega328p
 CLOCK      = 16000000
+
+L_FUSE = 0xFF
+H_FUSE = 0xDE
+E_FUSE = 0xFF
+
 PROGRAMMER = -e -v -p $(DEVICE) -c arduino -P COM6 -b 19200 -D 
-OBJECTS    = main.o
-FUSES      = -U lfuse:w:0xFF:m -U hfuse:w:0xDE:m
 
 ######################################################################
 ######################################################################
@@ -22,18 +25,18 @@ flash:	all
 	$(AVRDUDE) -U flash:w:main.hex:i
 
 fuse:
-	$(AVRDUDE) $(FUSES)
+	$(AVRDUDE) -U lfuse:w:$(L_FUSE):m -U hfuse:w:$(H_FUSE):m
 
 clean:
-	del main.hex main.elf $(OBJECTS)
+	del main.hex main.elf main.o
 
 # file targets:
-main.elf: $(OBJECTS)
-	$(COMPILE) -o main.elf $(OBJECTS)
+main.elf: main.o
+	$(COMPILE) -o main.elf main.o
 
 main.hex: main.elf
 	avr-objcopy -j .text -j .data -O ihex main.elf main.hex
-	avr-size -d main.hex
+	avr-size --format=avr --mcu=$(DEVICE) -d main.elf
 
 disasm:	main.elf
 	avr-objdump -d -S main.elf

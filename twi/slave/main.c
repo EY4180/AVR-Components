@@ -1,12 +1,5 @@
 #include "../shared.h"
 
-#define FRAME_SIZE sizeof(FRAME)
-
-FUSES = {
-	.low = FUSE_CKSEL0,
-	.high = FUSE_SPIEN & FUSE_BODLEVEL2 & FUSE_BODLEVEL1,
-	.extended = EFUSE_DEFAULT};
-
 void twi_slave_receiver(FRAME *frame)
 {
 	uint8_t received_bytes = 0;
@@ -16,6 +9,9 @@ void twi_slave_receiver(FRAME *frame)
 	// state: idle
 	// action: select slave receiver mode
 	TWCR = _BV(TWINT) | _BV(TWEA) | _BV(TWEN);
+
+	// wait until action complete
+	loop_until_bit_is_set(TWCR, TWINT);
 
 	while (listening)
 	{
@@ -34,8 +30,9 @@ void twi_slave_receiver(FRAME *frame)
 			stream[received_bytes++] = TWDR;
 			break;
 
+		// state: transmission complete
+		// action: end connection, check frame
 		case TW_SR_STOP:
-			memcpy(frame, stream, FRAME_SIZE);
 			listening = false;
 			break;
 
@@ -45,6 +42,11 @@ void twi_slave_receiver(FRAME *frame)
 
 		// wait until action complete
 		loop_until_bit_is_set(TWCR, TWINT);
+	}
+
+	if (received_bytes == FRAME_SIZE)
+	{
+		memcpy(frame, stream, FRAME_SIZE);
 	}
 }
 
@@ -72,6 +74,5 @@ int main()
 		}
 	}
 
-	/* code */
 	return 0;
 }
