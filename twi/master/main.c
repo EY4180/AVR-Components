@@ -1,6 +1,42 @@
 #include "../shared.h"
 
-void twi_master(FRAME *frame, uint8_t address, uint8_t rw)
+void twi_master_receiever(const FRAME *frame, const uint8_t address)
+{
+	bool link_established = true;
+	uint8_t byte = 0;
+	uint8_t stream[STREAM_SIZE];
+
+	// state: idle
+	// action: send start condition
+	TWCR = _BV(TWINT) | _BV(TWSTA) | _BV(TWEN);
+	loop_until_bit_is_set(TWCR, TWINT);
+
+	do
+	{
+		switch (TW_STATUS)
+		{
+		// state: start condition sent
+		// action: send SLA+W/R
+		case TW_START:
+			TWDR = __builtin_avr_insert_bits(0xfffffff0, TW_READ, address);
+			TWCR = _BV(TWINT) | _BV(TWEN);
+			break;
+
+		// state: missed acknowledge window
+		// action: end transmission
+		default:
+			break;
+		}
+
+		loop_until_bit_is_set(TWCR, TWINT);
+	} while ((byte < FRAME_SIZE) && link_established);
+
+	// state: transmission complete
+	// action: send stop condition
+	TWCR = _BV(TWINT) | _BV(TWSTO) | _BV(TWEN);
+}
+
+void twi_master_transmitter(const FRAME *frame, const uint8_t address)
 {
 	bool link_established = true;
 
@@ -19,7 +55,7 @@ void twi_master(FRAME *frame, uint8_t address, uint8_t rw)
 		// state: start condition sent
 		// action: send SLA+W/R
 		case TW_START:
-			TWDR = __builtin_avr_insert_bits(0xfffffff0, rw, address);
+			TWDR = __builtin_avr_insert_bits(0xfffffff0, TW_WRITE, address);
 			TWCR = _BV(TWINT) | _BV(TWEN);
 			break;
 
@@ -70,7 +106,7 @@ int main()
 
 	while (1)
 	{
-		twi_master(&my_frame, SLAVE_ADDRESS, TW_WRITE);
+		twi_master_transmitter(&my_frame, SLAVE_ADDRESS);
 		__builtin_avr_delay_cycles(F_CPU);
 	}
 
