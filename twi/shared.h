@@ -9,12 +9,13 @@
 #include <stdlib.h>
 
 #define BUFFER_SIZE 8
+#define STREAM_SIZE 32
 
 #define SLAVE_ADDRESS 0xA0
 #define MASTER_ADDRESS 0xB0
 
 #define BAUD 1000
-#define BAUD_REGISTER ((F_CPU / BAUD - 16) >> 1)
+#define BAUD_REGISTER (((F_CPU / BAUD) - 16) >> 1)
 
 typedef struct frame
 {

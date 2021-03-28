@@ -1,10 +1,10 @@
 #include "../shared.h"
 
-void twi_slave_receiver(FRAME *frame)
+void twi_slave(FRAME *frame)
 {
-	uint8_t received_bytes = 0;
-	uint8_t stream[FRAME_SIZE];
-	bool listening = true;
+	uint8_t byte = 0;
+	uint8_t stream[STREAM_SIZE];
+	bool link_established = true;
 
 	// state: idle
 	// action: select slave receiver mode
@@ -12,12 +12,12 @@ void twi_slave_receiver(FRAME *frame)
 
 	// wait until action complete
 	loop_until_bit_is_set(TWCR, TWINT);
-
-	while (listening)
+	
+	do
 	{
 		switch (TW_STATUS)
 		{
-		// state: received ping
+		// state: received ping in write mode
 		// action: send acknowledge
 		case TW_SR_SLA_ACK:
 			TWCR = _BV(TWINT) | _BV(TWEA) | _BV(TWEN);
@@ -27,41 +27,39 @@ void twi_slave_receiver(FRAME *frame)
 		// action: store data
 		case TW_SR_DATA_ACK:
 			TWCR = _BV(TWINT) | _BV(TWEA) | _BV(TWEN);
-			stream[received_bytes++] = TWDR;
+			stream[byte++] = TWDR;
 			break;
 
 		// state: transmission complete
 		// action: end connection, check frame
 		case TW_SR_STOP:
-			listening = false;
+			memcpy(frame, stream, FRAME_SIZE);
+			link_established = false;
 			break;
-
+		
 		default:
+			link_established = false;
 			break;
 		}
 
 		// wait until action complete
 		loop_until_bit_is_set(TWCR, TWINT);
-	}
-
-	if (received_bytes == FRAME_SIZE)
-	{
-		memcpy(frame, stream, FRAME_SIZE);
-	}
+	} while (link_established);
 }
 
 int main()
 {
 	__builtin_avr_cli();
-	FRAME my_frame;
 	TWAR = SLAVE_ADDRESS;
 	DDRD = 0xFF;
+
+	FRAME my_frame;
 
 	__builtin_avr_sei();
 
 	while (1)
 	{
-		twi_slave_receiver(&my_frame);
+		twi_slave(&my_frame);
 		uint8_t received_crc = 0;
 		for (int i = 0; i < BUFFER_SIZE; i++)
 		{

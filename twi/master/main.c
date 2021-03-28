@@ -1,20 +1,18 @@
 #include "../shared.h"
 
-void twi_master_transmitter(FRAME *frame, uint8_t address, uint8_t rw)
+void twi_master(FRAME *frame, uint8_t address, uint8_t rw)
 {
-	bool sending = true;
-	uint8_t transmitted_bytes = 0;
-	uint8_t stream[FRAME_SIZE];
-	memcpy(stream, frame, FRAME_SIZE);
+	bool link_established = true;
+
+	uint8_t byte = 0;
+	uint8_t stream[STREAM_SIZE];
 
 	// state: idle
 	// action: send start condition
 	TWCR = _BV(TWINT) | _BV(TWSTA) | _BV(TWEN);
-
-	// wait until action complete
 	loop_until_bit_is_set(TWCR, TWINT);
 
-	while (sending)
+	do
 	{
 		switch (TW_STATUS)
 		{
@@ -26,31 +24,25 @@ void twi_master_transmitter(FRAME *frame, uint8_t address, uint8_t rw)
 			break;
 
 		// state: slave acknowledged ping
-		// action: send first byte
+		// action: prepare frame and send first byte
 		case TW_MT_SLA_ACK:
-
+			memcpy(stream, frame, FRAME_SIZE);
 		// state: slave acknowledged byte
 		// action: send next byte
 		case TW_MT_DATA_ACK:
-			TWDR = stream[transmitted_bytes++];
+			TWDR = stream[byte++];
 			TWCR = _BV(TWINT) | _BV(TWEN);
-			sending = transmitted_bytes < FRAME_SIZE;
 			break;
 
 		// state: missed acknowledge window
 		// action: end transmission
-		case TW_MT_DATA_NACK:
-		case TW_MT_SLA_NACK:
-			sending = false;
-			break;
-
 		default:
+			link_established = false;
 			break;
 		}
 
-		// wait until action complete
 		loop_until_bit_is_set(TWCR, TWINT);
-	}
+	} while ((byte < FRAME_SIZE) && link_established);
 
 	// state: transmission complete
 	// action: send stop condition
@@ -60,7 +52,9 @@ void twi_master_transmitter(FRAME *frame, uint8_t address, uint8_t rw)
 int main()
 {
 	__builtin_avr_cli();
-	TWBR = BAUD_REGISTER;
+	DDRD = 0xFF;
+
+	TWBR = 0xFF;
 	TWAR = MASTER_ADDRESS;
 
 	FRAME my_frame;
@@ -72,12 +66,11 @@ int main()
 		my_frame.data[i] = 'a' + i;
 		my_frame.crc = _crc8_ccitt_update(my_frame.crc, my_frame.data[i]);
 	}
-
 	__builtin_avr_sei();
 
 	while (1)
 	{
-		twi_master_transmitter(&my_frame, SLAVE_ADDRESS, TW_WRITE);
+		twi_master(&my_frame, SLAVE_ADDRESS, TW_WRITE);
 		__builtin_avr_delay_cycles(F_CPU);
 	}
 
