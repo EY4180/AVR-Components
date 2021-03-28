@@ -22,11 +22,9 @@ void twi_master_receiever(FRAME *frame, const uint8_t address)
 			TWCR = _BV(TWINT) | _BV(TWEN);
 			break;
 
-		case TW_MR_SLA_ACK:
-			TWCR = _BV(TWINT) | _BV(TWEN) | _BV(TWEA);
-			break;
 		case TW_MR_DATA_ACK:
 			stream[byte++] = TWDR;
+		case TW_MR_SLA_ACK:
 			TWCR = _BV(TWINT) | _BV(TWEN) | _BV(TWEA);
 			break;
 
@@ -95,19 +93,17 @@ void twi_master_transmitter(const FRAME *frame, const uint8_t address)
 	// action: send stop condition
 	TWCR = _BV(TWINT) | _BV(TWSTO) | _BV(TWEN);
 }
-
 void init_frame(FRAME *frame)
 {
-	frame->crc = 0;
 	frame->control = 0xFF;
 
-	for (size_t i = 0; i < BUFFER_SIZE; i++)
+	frame->crc = 0;
+	for (size_t i = 0; i < BUFFER_SIZE; ++i)
 	{
 		frame->data[i] = 'a' + i;
 		frame->crc = _crc8_ccitt_update(frame->crc, frame->data[i]);
 	}	
 }
-
 int main()
 {
 	__builtin_avr_cli();

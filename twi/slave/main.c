@@ -62,19 +62,17 @@ void twi_slave(FRAME *frame)
 		loop_until_bit_is_set(TWCR, TWINT);
 	} while (link_established);
 }
-
 void init_frame(FRAME *frame)
 {
-	frame->crc = 0;
 	frame->control = 0xFF;
 
-	for (size_t i = 0; i < BUFFER_SIZE; i++)
+	frame->crc = 0;
+	for (size_t i = 0; i < BUFFER_SIZE; ++i)
 	{
 		frame->data[i] = 'a' + i;
 		frame->crc = _crc8_ccitt_update(frame->crc, frame->data[i]);
 	}	
 }
-
 int main()
 {
 	__builtin_avr_cli();

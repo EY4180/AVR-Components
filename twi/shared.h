@@ -12,10 +12,12 @@
 #define STREAM_SIZE 32
 
 #define SLAVE_ADDRESS 0xA0
-#define MASTER_ADDRESS 0xB0
+#define SLAVE_ADDRESS_WRITE 0xA0
+#define SLAVE_ADDRESS_READ 0xA1
 
-#define BAUD 1000
-#define BAUD_REGISTER (((F_CPU / BAUD) - 16) >> 1)
+#define MASTER_ADDRESS 0xB0
+#define MASTER_ADDRESS_WRITE 0xB0
+#define MASTER_ADDRESS_READ 0xB1
 
 typedef struct frame
 {
