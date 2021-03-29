@@ -39,19 +39,11 @@ void twi_slave(FRAME *frame)
 			memcpy(stream, frame, FRAME_SIZE);
 		case TW_ST_DATA_ACK:
 			TWDR = stream[byte++];
-
-			if (byte < FRAME_SIZE)
-			{
-				TWCR = _BV(TWINT) | _BV(TWEA) | _BV(TWEN);
-			}
-			else
-			{
-				TWCR = _BV(TWINT) | _BV(TWEN);
-			}
-
+			TWCR = _BV(TWINT) | (byte < FRAME_SIZE) << TWEA | _BV(TWEN);
 			break;
 
 		case TW_ST_LAST_DATA:
+			PORTD = ~PORTD;
 			link_established = false;
 			break;
 
