@@ -12,22 +12,20 @@ void twi_slave(FRAME *frame)
 
 	// wait until action complete
 	loop_until_bit_is_set(TWCR, TWINT);
-	
+
 	do
 	{
 		switch (TW_STATUS)
 		{
+		// state: received data and acknowledged
+		// action: store data
+		case TW_SR_DATA_ACK:
+			stream[byte++] = TWDR;
+
 		// state: received ping in write mode
 		// action: send acknowledge
 		case TW_SR_SLA_ACK:
 			TWCR = _BV(TWINT) | _BV(TWEA) | _BV(TWEN);
-			break;
-
-		// state: received data and acknowledged
-		// action: store data
-		case TW_SR_DATA_ACK:
-			TWCR = _BV(TWINT) | _BV(TWEA) | _BV(TWEN);
-			stream[byte++] = TWDR;
 			break;
 
 		// state: transmission complete
@@ -41,16 +39,20 @@ void twi_slave(FRAME *frame)
 			memcpy(stream, frame, FRAME_SIZE);
 		case TW_ST_DATA_ACK:
 			TWDR = stream[byte++];
-			
-			if (byte == FRAME_SIZE)
-			{
-				TWCR = _BV(TWINT) | _BV(TWEN);
-			}
-			else
+
+			if (byte < FRAME_SIZE)
 			{
 				TWCR = _BV(TWINT) | _BV(TWEA) | _BV(TWEN);
 			}
-			
+			else
+			{
+				TWCR = _BV(TWINT) | _BV(TWEN);
+			}
+
+			break;
+
+		case TW_ST_LAST_DATA:
+			link_established = false;
 			break;
 
 		default:
@@ -71,7 +73,7 @@ void init_frame(FRAME *frame)
 	{
 		frame->data[i] = 'a' + i;
 		frame->crc = _crc8_ccitt_update(frame->crc, frame->data[i]);
-	}	
+	}
 }
 int main()
 {

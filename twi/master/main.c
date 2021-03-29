@@ -25,7 +25,15 @@ void twi_master_receiever(FRAME *frame, const uint8_t address)
 		case TW_MR_DATA_ACK:
 			stream[byte++] = TWDR;
 		case TW_MR_SLA_ACK:
-			TWCR = _BV(TWINT) | _BV(TWEN) | _BV(TWEA);
+			if (byte < FRAME_SIZE)
+			{
+				TWCR = _BV(TWINT) | _BV(TWEN) | _BV(TWEA);
+			}
+			else
+			{
+				TWCR = _BV(TWINT) | _BV(TWEN);
+			}
+
 			break;
 
 		// state: missed acknowledge window
@@ -102,7 +110,7 @@ void init_frame(FRAME *frame)
 	{
 		frame->data[i] = 'a' + i;
 		frame->crc = _crc8_ccitt_update(frame->crc, frame->data[i]);
-	}	
+	}
 }
 int main()
 {
