@@ -30,7 +30,7 @@
 #define STATUS GPIOR0
 #define UPDATE_DISPLAY 0
 
-volatile unsigned update_count;
+volatile int update_count;
 
 void write_data(const uint8_t data, bool data_byte)
 {
