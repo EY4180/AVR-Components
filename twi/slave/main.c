@@ -2,26 +2,22 @@
 
 void twi_slave(FRAME *frame)
 {
-	uint8_t byte = 0;
-	uint8_t stream[STREAM_SIZE];
-	bool link_established = true;
-
+	uint8_t byte_count = 0;
+	uint8_t stream[FRAME_SIZE];
+	
 	// state: idle
 	// action: select slave receiver mode
 	TWCR = _BV(TWINT) | _BV(TWEA) | _BV(TWEN);
-
-	// wait until action complete
 	loop_until_bit_is_set(TWCR, TWINT);
 
-	do
+	while (1)
 	{
 		switch (TW_STATUS)
 		{
 		// state: received data and acknowledged
 		// action: store data
 		case TW_SR_DATA_ACK:
-			stream[byte++] = TWDR;
-
+			stream[byte_count++] = TWDR;
 		// state: received ping in write mode
 		// action: send acknowledge
 		case TW_SR_SLA_ACK:
@@ -32,29 +28,36 @@ void twi_slave(FRAME *frame)
 		// action: end connection, check frame
 		case TW_SR_STOP:
 			memcpy(frame, stream, FRAME_SIZE);
-			link_established = false;
-			break;
+			return;
 
 		case TW_ST_SLA_ACK:
 			memcpy(stream, frame, FRAME_SIZE);
 		case TW_ST_DATA_ACK:
-			TWDR = stream[byte++];
-			TWCR = _BV(TWINT) | (byte < FRAME_SIZE) << TWEA | _BV(TWEN);
+			TWDR = stream[byte_count++];
+
+			if (byte_count < FRAME_SIZE)
+			{
+				TWCR = _BV(TWINT) | _BV(TWEA) | _BV(TWEN);
+			}
+			else
+			{
+				TWCR = _BV(TWINT) | _BV(TWEN);
+			}
 			break;
 
 		case TW_ST_LAST_DATA:
 			PORTD = ~PORTD;
-			link_established = false;
-			break;
+			return;
 
+		// state: error occured on bus
+		// action: return from function
 		default:
-			link_established = false;
-			break;
+			return;
 		}
 
 		// wait until action complete
 		loop_until_bit_is_set(TWCR, TWINT);
-	} while (link_established);
+	}
 }
 void init_frame(FRAME *frame)
 {
